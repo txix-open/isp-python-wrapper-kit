@@ -1,41 +1,20 @@
 package service
 
-import (
-	"context"
-
-	"github.com/pkg/errors"
-	"github.com/txix-open/isp-kit/log"
-)
-
-type Upgrader interface {
-	Upgrade(ctx context.Context, moduleName string, hosts []string) error
-}
-
 type HostsUpgrader struct {
-	moduleName string
-	upgrader   Upgrader
-	logger     log.Logger
+	moduleName  string
+	upgradeFunc func(string, []string)
 }
 
 func NewHostsUpgrader(
 	moduleName string,
-	upgrader Upgrader,
-	logger log.Logger,
+	upgradeFunc func(string, []string),
 ) HostsUpgrader {
 	return HostsUpgrader{
-		moduleName: moduleName,
-		upgrader:   upgrader,
-		logger:     logger,
+		moduleName:  moduleName,
+		upgradeFunc: upgradeFunc,
 	}
 }
 
 func (s HostsUpgrader) Upgrade(hosts []string) {
-	ctx := context.Background()
-	err := s.upgrader.Upgrade(ctx, s.moduleName, hosts)
-	if err != nil {
-		s.logger.Error(ctx,
-			errors.WithMessage(err, "upgrade hosts for module"),
-			log.String("moduleName", s.moduleName),
-		)
-	}
+	s.upgradeFunc(s.moduleName, hosts)
 }

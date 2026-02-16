@@ -21,6 +21,7 @@ import (
 type PythonSupervisor interface {
 	Start(ctx context.Context) error
 	UpdateConfig(newConfig []byte) error
+	Upgrade(moduleName string, hosts []string)
 	Stop()
 }
 
@@ -47,7 +48,16 @@ func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[
 	if err != nil {
 		return nil, errors.WithMessage(err, "resolve python module path")
 	}
-	pySupervisor := service.NewPySupervisor(boot.BindingAddress, configPath, pythonModulePath, logger)
+	upgrader := repository.NewHostsUpgrader(innerCli)
+
+	pySupervisor := service.NewPySupervisor(
+		boot.BindingAddress,
+		configPath,
+		pythonModulePath,
+		upgrader,
+		requiredModules,
+		logger,
+	)
 
 	return &Assembly[T]{
 		boot:            boot,
@@ -78,11 +88,10 @@ func (a *Assembly[T]) Runners() []app.Runner {
 	eventHandler := cluster.NewEventHandler().
 		RemoteConfigReceiver(a)
 
-	upgrader := repository.NewHostsUpgrader(a.innerCli)
 	for _, requiredModule := range a.requiredModules {
 		eventHandler = eventHandler.RequireModule(
 			requiredModule,
-			service.NewHostsUpgrader(requiredModule, upgrader, a.logger),
+			service.NewHostsUpgrader(requiredModule, a.pySupervisor.Upgrade),
 		)
 	}
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"gitlab.txix.ru/isp/isp-python-wrapper-kit/repository"
-	"gitlab.txix.ru/isp/isp-python-wrapper-kit/service"
+	"github.com/txix-open/isp-python-wrapper-kit/repository"
+	"github.com/txix-open/isp-python-wrapper-kit/service"
 
 	"github.com/tidwall/gjson"
 	"github.com/txix-open/isp-kit/http/httpcli"

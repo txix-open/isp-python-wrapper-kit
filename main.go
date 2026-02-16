@@ -1,7 +1,7 @@
 package isp_python_wrapper_kit
 
 import (
-	"gitlab.txix.ru/isp/isp-python-wrapper-kit/assembly"
+	"github.com/txix-open/isp-python-wrapper-kit/assembly"
 
 	"github.com/txix-open/isp-kit/bootstrap"
 	"github.com/txix-open/isp-kit/cluster"

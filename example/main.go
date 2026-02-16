@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/txix-open/isp-kit/log"
-	pythonWrapper "gitlab.txix.ru/isp/isp-python-wrapper-kit"
+	pythonWrapper "github.com/txix-open/isp-python-wrapper-kit"
 )
 
 type remoteConfig struct {

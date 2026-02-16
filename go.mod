@@ -1,4 +1,4 @@
-module gitlab.txix.ru/isp/isp-python-wrapper-kit
+module github.com/txix-open/isp-python-wrapper-kit
 
 go 1.25
 

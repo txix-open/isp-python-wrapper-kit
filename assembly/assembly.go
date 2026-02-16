@@ -58,7 +58,6 @@ func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[
 		requiredModules,
 		logger,
 	)
-
 	return &Assembly[T]{
 		boot:            boot,
 		innerCli:        innerCli,
@@ -73,8 +72,15 @@ func (a *Assembly[T]) ReceiveConfig(shortTtlCtx context.Context, remoteConfig []
 	if err != nil {
 		a.boot.Fatal(errors.WithMessage(err, "upgrade remote config"))
 	}
-	// nolint:gosec
-	a.logger.SetLevel(log.Level(gjson.GetBytes(remoteConfig, "logLevel").Int()))
+
+	cfgLogLevel := gjson.GetBytes(remoteConfig, "logLevel").String()
+
+	logLevel := log.Level(0)
+	err = logLevel.UnmarshalText([]byte(cfgLogLevel))
+	if err != nil {
+		a.boot.Fatal(errors.WithMessage(err, "parse log level"))
+	}
+	a.logger.SetLevel(logLevel)
 
 	err = a.pySupervisor.UpdateConfig(remoteConfig)
 	if err != nil {

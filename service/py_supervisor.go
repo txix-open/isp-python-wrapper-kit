@@ -110,20 +110,17 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 			}
 
 		case <-s.configUpdatedCh:
-			if cmd != nil {
-				s.stopProcess(ctx, cmd, exitCh)
-			}
+			s.stopProcess(ctx, cmd, exitCh)
 			cmd, exitCh = s.ensureProcessRunning(ctx)
 
 		case err := <-exitCh:
-			s.logger.Warn(ctx, "python exited", log.Any("error", err))
+			s.logProcessExited(ctx, err)
 			time.Sleep(restartProcessWaitTime)
+			s.logger.Info(ctx, "restart process")
 			cmd, exitCh = s.ensureProcessRunning(ctx)
 
 		case <-s.stopCh:
-			if cmd != nil {
-				s.stopProcess(ctx, cmd, exitCh)
-			}
+			s.stopProcess(ctx, cmd, exitCh)
 			return
 		}
 	}
@@ -156,9 +153,9 @@ func (s *PySupervisor) startProcess(ctx context.Context) (*exec.Cmd, chan error)
 		"BINDING_ADDRESS="+s.bindingAddress,
 		"CONFIG_FILE="+s.configPath,
 	)
-
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	setProcessGroup(cmd)
 
 	err := cmd.Start()
 	if err != nil {
@@ -178,27 +175,38 @@ func (s *PySupervisor) startProcess(ctx context.Context) (*exec.Cmd, chan error)
 	return cmd, exitCh
 }
 
-func (s *PySupervisor) stopProcess(
-	ctx context.Context,
-	cmd *exec.Cmd,
-	done chan error,
-) {
-	if cmd == nil || cmd.Process == nil {
+func (s *PySupervisor) logProcessExited(ctx context.Context, err error) {
+	if err == nil {
+		s.logger.Info(ctx, "process exited gracefully")
 		return
 	}
 
-	err := cmd.Process.Signal(syscall.SIGTERM)
-	if err != nil {
-		s.logger.Warn(ctx, "failed to send SIGTERM", log.Any("error", err))
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		s.logger.Warn(ctx, "process wait error", log.Any("error", err))
+		return
 	}
 
-	select {
-	case err = <-done:
-	case <-time.After(shutdownProcessTimeout):
-		err = cmd.Process.Kill()
+	status, ok := exitErr.Sys().(syscall.WaitStatus)
+	if !ok {
+		s.logger.Warn(ctx, "process exited with unexpected status",
+			log.Any("error", err),
+		)
+		return
 	}
 
-	if err != nil {
-		s.logger.Warn(ctx, "python process did not stop gracefully", log.Any("error", err))
+	switch {
+	case status.Signaled():
+		sig := status.Signal()
+		s.logger.Info(ctx, "process exited", log.String("signal", sig.String()))
+	case status.Exited():
+		code := status.ExitStatus()
+		s.logger.Info(ctx, "process exited", log.Int("code", code))
+	default:
+		s.logger.Warn(ctx, "process exited with unexpected status",
+			log.Bool("stopped", status.Stopped()),
+			log.Bool("continued", status.Continued()),
+			log.Any("error", err),
+		)
 	}
 }

@@ -22,7 +22,7 @@ type PythonSupervisor interface {
 	Start(ctx context.Context) error
 	UpdateConfig(newConfig []byte) error
 	Upgrade(moduleName string, hosts []string)
-	Stop()
+	Close() error
 }
 
 type Assembly[T any] struct {
@@ -118,9 +118,6 @@ func (a *Assembly[T]) Runners() []app.Runner {
 func (a *Assembly[T]) Closers() []app.Closer {
 	return []app.Closer{
 		a.boot.ClusterCli,
-		app.CloserFunc(func() error {
-			a.pySupervisor.Stop()
-			return nil
-		}),
+		a.pySupervisor,
 	}
 }

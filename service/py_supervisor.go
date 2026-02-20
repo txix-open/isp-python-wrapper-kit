@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
@@ -37,6 +38,7 @@ type PySupervisor struct {
 	stopCh          chan bool
 	configUpdatedCh chan bool
 	upgradeCh       chan upgradeHostsEvent
+	wg              sync.WaitGroup
 }
 
 func NewPySupervisor(
@@ -63,6 +65,8 @@ func NewPySupervisor(
 
 func (s *PySupervisor) Start(ctx context.Context) error {
 	ctx = log.ToContext(ctx, log.String("worker", "supervisor"))
+	s.wg.Add(1)
+	defer s.wg.Done()
 	s.processLoop(ctx)
 	return nil
 }
@@ -81,8 +85,10 @@ func (s *PySupervisor) UpdateConfig(newConfig []byte) error {
 	return nil
 }
 
-func (s *PySupervisor) Stop() {
-	close(s.stopCh)
+func (s *PySupervisor) Close() error {
+	s.stopCh <- true
+	s.wg.Wait()
+	return nil
 }
 
 func (s *PySupervisor) Upgrade(module string, hosts []string) {

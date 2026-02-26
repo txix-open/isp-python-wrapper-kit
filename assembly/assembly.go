@@ -51,13 +51,13 @@ func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[
 	if err != nil {
 		return nil, errors.WithMessage(err, "resolve python module path")
 	}
-	upgrader := repository.NewHostsUpgrader(innerCli)
+	innerRepo := repository.NewInner(innerCli)
 
 	pySupervisor := service.NewPySupervisor(
 		boot.BindingAddress,
 		configPath,
 		pythonModulePath,
-		upgrader,
+		innerRepo,
 		requiredModules,
 		logger,
 	)

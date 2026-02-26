@@ -9,6 +9,7 @@ import (
 
 	"github.com/tidwall/gjson"
 	"github.com/txix-open/isp-kit/http/httpcli"
+	"github.com/txix-open/isp-kit/http/httpclix"
 	"github.com/txix-open/isp-kit/rc"
 
 	"github.com/pkg/errors"
@@ -35,7 +36,9 @@ type Assembly[T any] struct {
 
 func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[T], error) {
 	logger := boot.App.Logger()
-	innerCli := httpcli.New()
+	innerCli := httpclix.Default(
+		httpcli.WithMiddlewares(httpclix.Log(logger)),
+	)
 	innerCli.GlobalRequestConfig().BaseUrl = fmt.Sprintf("http://%s", boot.BindingAddress)
 
 	isOnDev := isOnDevMode()

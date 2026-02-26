@@ -104,11 +104,12 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 		case ev := <-s.upgradeCh:
 			s.modulesHosts[ev.module] = ev.hosts
 
-			if cmd != nil {
-				s.logger.Info(ctx, "apply hosts upgrade", log.String("module", ev.module))
-				_ = s.hostsUpgrader.Upgrade(ctx, ev.module, ev.hosts)
+			if cmd == nil {
+				continue
 			}
 
+			s.logger.Info(ctx, "apply hosts upgrade", log.String("module", ev.module))
+			_ = s.hostsUpgrader.Upgrade(ctx, ev.module, ev.hosts)
 		case <-s.configUpdatedCh:
 			s.stopProcess(ctx, cmd, exitCh)
 			cmd, exitCh = s.ensureProcessRunning(ctx)

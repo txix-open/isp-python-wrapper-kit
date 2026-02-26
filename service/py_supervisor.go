@@ -17,8 +17,8 @@ const (
 	restartProcessWaitTime = 2 * time.Second
 )
 
-type Upgrader interface {
-	Upgrade(ctx context.Context, moduleName string, hosts []string) error
+type InnerRepo interface {
+	ReceiveModuleAddresses(ctx context.Context, moduleName string, hosts []string) error
 }
 
 type upgradeHostsEvent struct {
@@ -32,8 +32,8 @@ type PySupervisor struct {
 	pyModulePath   string
 	logger         log.Logger
 
-	hostsUpgrader Upgrader
-	modulesHosts  map[string][]string
+	innerRepo    InnerRepo
+	modulesHosts map[string][]string
 
 	stopCh          chan bool
 	configUpdatedCh chan bool
@@ -45,7 +45,7 @@ func NewPySupervisor(
 	bindingAddress string,
 	configPath string,
 	pyModulePath string,
-	hostsUpgrader Upgrader,
+	innerRepo InnerRepo,
 	requiredModules []string,
 	logger log.Logger,
 ) *PySupervisor {
@@ -53,7 +53,7 @@ func NewPySupervisor(
 		bindingAddress: bindingAddress,
 		configPath:     configPath,
 		pyModulePath:   pyModulePath,
-		hostsUpgrader:  hostsUpgrader,
+		innerRepo:      innerRepo,
 		logger:         logger,
 
 		modulesHosts:    make(map[string][]string, len(requiredModules)),
@@ -104,11 +104,15 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 		case ev := <-s.upgradeCh:
 			s.modulesHosts[ev.module] = ev.hosts
 
-			if cmd != nil {
-				s.logger.Info(ctx, "apply hosts upgrade", log.String("module", ev.module))
-				_ = s.hostsUpgrader.Upgrade(ctx, ev.module, ev.hosts)
+			if cmd == nil {
+				continue
 			}
 
+			s.logger.Info(ctx, "apply hosts upgrade", log.String("module", ev.module))
+			err := s.innerRepo.ReceiveModuleAddresses(ctx, ev.module, ev.hosts)
+			if err != nil {
+				s.logger.Error(ctx, "failed to apply hosts", log.String("module", ev.module), log.Any("error", err))
+			}
 		case <-s.configUpdatedCh:
 			s.stopProcess(ctx, cmd, exitCh)
 			cmd, exitCh = s.ensureProcessRunning(ctx)
@@ -138,7 +142,7 @@ func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, cha
 	}
 
 	for module, hosts := range s.modulesHosts {
-		err := s.hostsUpgrader.Upgrade(ctx, module, hosts)
+		err := s.innerRepo.ReceiveModuleAddresses(ctx, module, hosts)
 		if err != nil {
 			s.logger.Error(ctx, "restore hosts for module", log.String("module", module), log.Any("error", err))
 		}

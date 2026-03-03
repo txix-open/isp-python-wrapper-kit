@@ -5,6 +5,10 @@ import (
 	pythonWrapper "github.com/txix-open/isp-python-wrapper-kit"
 )
 
+var (
+	version = "1.0.0"
+)
+
 type remoteConfig struct {
 	LogLevel log.Level `schemaGen:"logLevel" schema:"Уровень логирования"`
 }
@@ -21,5 +25,5 @@ type remoteConfig struct {
 //go:generate swag init -pd -ot json
 //go:generate rm -f docs/swagger.go
 func main() {
-	pythonWrapper.Main[remoteConfig](remoteConfig{}, nil, nil)
+	pythonWrapper.Main[remoteConfig](version, remoteConfig{}, nil, nil)
 }

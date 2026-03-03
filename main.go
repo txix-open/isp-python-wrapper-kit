@@ -8,11 +8,8 @@ import (
 	"github.com/txix-open/isp-kit/shutdown"
 )
 
-var (
-	version = "1.0.0"
-)
-
 func Main[T any](
+	version string,
 	remoteConfig any,
 	endpoints []cluster.EndpointDescriptor,
 	requiredModules []string,

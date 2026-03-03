@@ -44,8 +44,12 @@ import (
 	wrapperkit "gitlab.txix.ru/isp/isp-python-wrapper-kit"
 )
 
+var (
+	version = "1.0.0"
+)
+
 func main() {
-	wrapperKit.Main[conf.Remote](conf.Remote{}, nil, nil)
+	wrapperKit.Main[conf.Remote](version, conf.Remote{}, nil, nil)
 }
 ```
 
@@ -59,8 +63,12 @@ import (
 	wrapperkit "gitlab.txix.ru/isp/isp-python-wrapper-kit"
 )
 
+var (
+	version = "1.0.0"
+)
+
 func main() {
-	wrapperKit.Main[conf.Remote](conf.Remote{}, routes.EndpointDescriptors(), nil)
+	wrapperKit.Main[conf.Remote](version, conf.Remote{}, routes.EndpointDescriptors(), nil)
 }
 ```
 
@@ -73,7 +81,11 @@ import (
 	wrapperkit "gitlab.txix.ru/isp/isp-python-wrapper-kit"
 )
 
+var (
+	version = "1.0.0"
+)
+
 func main() {
-	wrapperKit.Main[conf.Remote](conf.Remote{}, nil, []string{"<required-module-name1>","<required-module-name2>"})
+	wrapperKit.Main[conf.Remote](version, conf.Remote{}, nil, []string{"<required-module-name1>","<required-module-name2>"})
 }
 ```

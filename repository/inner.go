@@ -31,14 +31,15 @@ func (r Inner) ReceiveModuleAddresses(ctx context.Context, moduleName string, ho
 		"module": moduleName,
 		"hosts":  hosts,
 	}
+
 	err := r.innerCli.Post(receiveModuleAddressEndpoint).
 		JsonRequestBody(payload).
 		Retry(httpcli.IfErrorOr5XXStatus(), retry.NewExponentialBackoff(maxRetryElapsedTime)).
 		StatusCodeToError().
 		DoWithoutResponse(ctx)
-
 	if err != nil {
 		return errors.WithMessagef(err, "call endpoint: %s", receiveModuleAddressEndpoint)
 	}
+
 	return nil
 }

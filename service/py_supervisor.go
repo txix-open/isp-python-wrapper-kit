@@ -31,11 +31,11 @@ type PySupervisor struct {
 	configPath     string
 	pyModulePath   string
 	logger         log.Logger
+	cancel         context.CancelFunc
 
 	innerRepo    InnerRepo
 	modulesHosts map[string][]string
 
-	stopCh          chan bool
 	configUpdatedCh chan bool
 	upgradeCh       chan upgradeHostsEvent
 	wg              sync.WaitGroup
@@ -57,16 +57,20 @@ func NewPySupervisor(
 		logger:         logger,
 
 		modulesHosts:    make(map[string][]string, len(requiredModules)),
-		stopCh:          make(chan bool, 1),
 		configUpdatedCh: make(chan bool, 1),
 		upgradeCh:       make(chan upgradeHostsEvent, len(requiredModules)),
 	}
 }
 
 func (s *PySupervisor) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
+
 	ctx = log.ToContext(ctx, log.String("worker", "supervisor"))
+
 	s.wg.Add(1)
 	defer s.wg.Done()
+
 	s.processLoop(ctx)
 	return nil
 }
@@ -86,7 +90,7 @@ func (s *PySupervisor) UpdateConfig(newConfig []byte) error {
 }
 
 func (s *PySupervisor) Close() error {
-	s.stopCh <- true
+	s.cancel()
 	s.wg.Wait()
 	return nil
 }
@@ -123,7 +127,7 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 			s.logger.Info(ctx, "restart process")
 			cmd, exitCh = s.ensureProcessRunning(ctx)
 
-		case <-s.stopCh:
+		case <-ctx.Done():
 			s.stopProcess(ctx, cmd, exitCh)
 			return
 		}

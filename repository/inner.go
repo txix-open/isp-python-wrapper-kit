@@ -11,6 +11,7 @@ import (
 
 const (
 	receiveModuleAddressEndpoint = "/receive_module_addresses"
+	healthcheckEndpoint          = "/internal/health"
 	maxRetryElapsedTime          = 5 * time.Second
 )
 
@@ -39,6 +40,17 @@ func (r Inner) ReceiveModuleAddresses(ctx context.Context, moduleName string, ho
 		DoWithoutResponse(ctx)
 	if err != nil {
 		return errors.WithMessagef(err, "call endpoint: %s", receiveModuleAddressEndpoint)
+	}
+
+	return nil
+}
+
+func (r Inner) Healthcheck(ctx context.Context) error {
+	err := r.innerCli.Get(healthcheckEndpoint).
+		StatusCodeToError().
+		DoWithoutResponse(ctx)
+	if err != nil {
+		return errors.WithMessagef(err, "call endpoint: %s", healthcheckEndpoint)
 	}
 
 	return nil

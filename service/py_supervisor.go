@@ -21,6 +21,10 @@ type InnerRepo interface {
 	ReceiveModuleAddresses(ctx context.Context, moduleName string, hosts []string) error
 }
 
+type HealthWaiterService interface {
+	Wait(ctx context.Context) error
+}
+
 type upgradeHostsEvent struct {
 	module string
 	hosts  []string
@@ -39,6 +43,8 @@ type PySupervisor struct {
 	configUpdatedCh chan bool
 	upgradeCh       chan upgradeHostsEvent
 	wg              sync.WaitGroup
+
+	healthWaiter HealthWaiterService
 }
 
 func NewPySupervisor(
@@ -47,6 +53,7 @@ func NewPySupervisor(
 	pyModulePath string,
 	innerRepo InnerRepo,
 	requiredModules []string,
+	healthWaiter HealthWaiterService,
 	logger log.Logger,
 ) *PySupervisor {
 	return &PySupervisor{
@@ -54,6 +61,7 @@ func NewPySupervisor(
 		configPath:     configPath,
 		pyModulePath:   pyModulePath,
 		innerRepo:      innerRepo,
+		healthWaiter:   healthWaiter,
 		logger:         logger,
 
 		modulesHosts:    make(map[string][]string, len(requiredModules)),
@@ -135,23 +143,65 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 }
 
 func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, chan error) {
-	var cmd *exec.Cmd
-	var exitCh chan error
+	for {
+		var cmd *exec.Cmd
+		var exitCh chan error
 
-	for cmd == nil {
-		cmd, exitCh = s.startProcess(ctx)
-		if cmd == nil {
+		for cmd == nil {
+			cmd, exitCh = s.startProcess(ctx)
+			if cmd != nil {
+				break
+			}
+			select {
+			case <-time.After(restartProcessWaitTime):
+				continue
+			case <-ctx.Done():
+				return nil, nil
+			}
+		}
+
+		healthCh := make(chan error, 1)
+
+		go func() {
+			healthCh <- s.healthWaiter.Wait(ctx)
+		}()
+
+		select {
+		case err := <-healthCh:
+			if err != nil {
+				s.logger.Error(ctx,
+					"process failed to become healthy",
+					log.Any("error", err),
+				)
+
+				s.stopProcess(ctx, cmd, exitCh)
+				time.Sleep(restartProcessWaitTime)
+				continue
+			}
+
+		case err := <-exitCh:
+			s.logProcessExited(ctx, err)
 			time.Sleep(restartProcessWaitTime)
-		}
-	}
+			continue
 
-	for module, hosts := range s.modulesHosts {
-		err := s.innerRepo.ReceiveModuleAddresses(ctx, module, hosts)
-		if err != nil {
-			s.logger.Error(ctx, "restore hosts for module", log.String("module", module), log.Any("error", err))
+		case <-ctx.Done():
+			s.stopProcess(ctx, cmd, exitCh)
+			return nil, nil
 		}
+
+		// healthy
+		for module, hosts := range s.modulesHosts {
+			err := s.innerRepo.ReceiveModuleAddresses(ctx, module, hosts)
+			if err != nil {
+				s.logger.Error(ctx, "restore hosts for module",
+					log.String("module", module),
+					log.Any("error", err),
+				)
+			}
+		}
+
+		return cmd, exitCh
 	}
-	return cmd, exitCh
 }
 
 func (s *PySupervisor) startProcess(ctx context.Context) (*exec.Cmd, chan error) {

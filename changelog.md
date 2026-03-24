@@ -1,3 +1,5 @@
+## 1.2.0
+* Перед вызовом `/receive_module_addresses` ожидается success ответ (http status code от 200 до 299) на `GET /internal/health`
 ## 1.1.2
 * Добавлен проброс версии модуля
 ## 1.1.1

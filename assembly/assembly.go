@@ -3,11 +3,13 @@ package assembly
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/txix-open/isp-python-wrapper-kit/repository"
 	"github.com/txix-open/isp-python-wrapper-kit/service"
 
 	"github.com/tidwall/gjson"
+	"github.com/txix-open/isp-kit/config"
 	"github.com/txix-open/isp-kit/http/httpcli"
 	"github.com/txix-open/isp-kit/http/httpclix"
 	"github.com/txix-open/isp-kit/rc"
@@ -17,6 +19,12 @@ import (
 	"github.com/txix-open/isp-kit/bootstrap"
 	"github.com/txix-open/isp-kit/cluster"
 	"github.com/txix-open/isp-kit/log"
+)
+
+const (
+	defaultHealthcheckStartDelay = 100 * time.Millisecond
+	defaultHealthcheckRetryDelay = 1 * time.Second
+	defaultHealthcheckTimeout    = 0 * time.Second // выключен
 )
 
 type PythonSupervisor interface {
@@ -34,6 +42,15 @@ type Assembly[T any] struct {
 	logger          *log.Adapter
 }
 
+type AssemblyConfig struct {
+	ConfigPath       string
+	PythonModulePath string
+
+	HealthcheckStartDelay time.Duration
+	HealthcheckRetryDelay time.Duration
+	HealthcheckTimeout    time.Duration
+}
+
 func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[T], error) {
 	logger := boot.App.Logger()
 	innerCli := httpclix.Default(
@@ -41,24 +58,28 @@ func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[
 	)
 	innerCli.GlobalRequestConfig().BaseUrl = fmt.Sprintf("http://%s", boot.BindingAddress)
 
-	isOnDev := isOnDevMode()
-	configPath, err := resolveConfigPath(isOnDev)
+	cfg, err := getConfig(boot.App.Config())
 	if err != nil {
-		return nil, errors.WithMessage(err, "resolve config path")
+		return nil, errors.WithMessage(err, "get config")
 	}
 
-	pythonModulePath, err := resolvePyModulePath(isOnDev)
-	if err != nil {
-		return nil, errors.WithMessage(err, "resolve python module path")
-	}
 	innerRepo := repository.NewInner(innerCli)
+
+	healthWaiter := service.NewHealthWaiter(
+		cfg.HealthcheckStartDelay,
+		cfg.HealthcheckRetryDelay,
+		cfg.HealthcheckTimeout,
+		innerRepo,
+		logger,
+	)
 
 	pySupervisor := service.NewPySupervisor(
 		boot.BindingAddress,
-		configPath,
-		pythonModulePath,
+		cfg.ConfigPath,
+		cfg.PythonModulePath,
 		innerRepo,
 		requiredModules,
+		healthWaiter,
 		logger,
 	)
 	return &Assembly[T]{
@@ -123,4 +144,25 @@ func (a *Assembly[T]) Closers() []app.Closer {
 		a.boot.ClusterCli,
 		a.pySupervisor,
 	}
+}
+
+func getConfig(cfg *config.Config) (*AssemblyConfig, error) {
+	isOnDev := isOnDevMode()
+	configPath, err := resolveConfigPath(isOnDev)
+	if err != nil {
+		return nil, errors.WithMessage(err, "resolve config path")
+	}
+
+	pythonModulePath, err := resolvePyModulePath(isOnDev)
+	if err != nil {
+		return nil, errors.WithMessage(err, "resolve python module path")
+	}
+
+	return &AssemblyConfig{
+		ConfigPath:            configPath,
+		PythonModulePath:      pythonModulePath,
+		HealthcheckStartDelay: cfg.Optional().Duration("python.healthcheckStartDelay", defaultHealthcheckStartDelay),
+		HealthcheckRetryDelay: cfg.Optional().Duration("python.healthcheckRetryDelay", defaultHealthcheckRetryDelay),
+		HealthcheckTimeout:    cfg.Optional().Duration("python.healthcheckTimeout", defaultHealthcheckTimeout),
+	}, nil
 }

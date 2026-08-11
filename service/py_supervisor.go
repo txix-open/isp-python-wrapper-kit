@@ -131,7 +131,10 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 
 		case err := <-exitCh:
 			s.logProcessExited(ctx, err)
-			time.Sleep(restartProcessWaitTime)
+			if !s.waitRestart(ctx) {
+				return
+			}
+
 			s.logger.Info(ctx, "restart process")
 			cmd, exitCh = s.ensureProcessRunning(ctx)
 
@@ -144,6 +147,14 @@ func (s *PySupervisor) processLoop(ctx context.Context) {
 
 func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, chan error) {
 	for {
+		// The config may have been updated before the process exited.
+		// Consume the pending update because the restarted process will
+		// already start with the latest config.
+		select {
+		case <-s.configUpdatedCh:
+		default:
+		}
+
 		var cmd *exec.Cmd
 		var exitCh chan error
 
@@ -152,10 +163,7 @@ func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, cha
 			if cmd != nil {
 				break
 			}
-			select {
-			case <-time.After(restartProcessWaitTime):
-				continue
-			case <-ctx.Done():
+			if !s.waitRestart(ctx) {
 				return nil, nil
 			}
 		}
@@ -177,14 +185,20 @@ func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, cha
 				)
 
 				s.stopProcess(ctx, cmd, exitCh)
-				time.Sleep(restartProcessWaitTime)
+				if !s.waitRestart(ctx) {
+					return nil, nil
+				}
 				continue
 			}
 
 		case err := <-exitCh:
 			cancelHealth()
+
 			s.logProcessExited(ctx, err)
-			time.Sleep(restartProcessWaitTime)
+
+			if !s.waitRestart(ctx) {
+				return nil, nil
+			}
 			continue
 
 		case <-ctx.Done():
@@ -270,5 +284,17 @@ func (s *PySupervisor) logProcessExited(ctx context.Context, err error) {
 			log.Bool("continued", status.Continued()),
 			log.Any("error", err),
 		)
+	}
+}
+
+func (s *PySupervisor) waitRestart(ctx context.Context) bool {
+	timer := time.NewTimer(restartProcessWaitTime)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }

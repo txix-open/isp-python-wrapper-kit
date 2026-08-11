@@ -14,7 +14,6 @@ import (
 
 const (
 	shutdownProcessTimeout = 5 * time.Second
-	restartProcessWaitTime = 2 * time.Second
 )
 
 type InnerRepo interface {
@@ -44,7 +43,8 @@ type PySupervisor struct {
 	upgradeCh       chan upgradeHostsEvent
 	wg              sync.WaitGroup
 
-	healthWaiter HealthWaiterService
+	healthWaiter           HealthWaiterService
+	restartProcessWaitTime time.Duration
 }
 
 func NewPySupervisor(
@@ -54,15 +54,17 @@ func NewPySupervisor(
 	innerRepo InnerRepo,
 	requiredModules []string,
 	healthWaiter HealthWaiterService,
+	restartProcessWaitTime time.Duration,
 	logger log.Logger,
 ) *PySupervisor {
 	return &PySupervisor{
-		bindingAddress: bindingAddress,
-		configPath:     configPath,
-		pyModulePath:   pyModulePath,
-		innerRepo:      innerRepo,
-		healthWaiter:   healthWaiter,
-		logger:         logger,
+		bindingAddress:         bindingAddress,
+		configPath:             configPath,
+		pyModulePath:           pyModulePath,
+		innerRepo:              innerRepo,
+		healthWaiter:           healthWaiter,
+		restartProcessWaitTime: restartProcessWaitTime,
+		logger:                 logger,
 
 		modulesHosts:    make(map[string][]string, len(requiredModules)),
 		configUpdatedCh: make(chan bool, 1),
@@ -288,7 +290,7 @@ func (s *PySupervisor) logProcessExited(ctx context.Context, err error) {
 }
 
 func (s *PySupervisor) waitRestart(ctx context.Context) bool {
-	timer := time.NewTimer(restartProcessWaitTime)
+	timer := time.NewTimer(s.restartProcessWaitTime)
 	defer timer.Stop()
 
 	select {

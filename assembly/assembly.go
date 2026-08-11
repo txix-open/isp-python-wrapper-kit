@@ -51,7 +51,17 @@ type AssemblyConfig struct {
 	HealthcheckTimeout    time.Duration
 }
 
-func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[T], error) {
+func New[T any](
+	boot *bootstrap.Bootstrap,
+	requiredModules []string,
+	opts ...Option,
+) (*Assembly[T], error) {
+	options := defaultOptions()
+
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	logger := boot.App.Logger()
 	innerCli := httpclix.Default(
 		httpcli.WithMiddlewares(httpclix.Log(logger)),
@@ -80,6 +90,7 @@ func New[T any](boot *bootstrap.Bootstrap, requiredModules []string) (*Assembly[
 		innerRepo,
 		requiredModules,
 		healthWaiter,
+		options.restartProcessWaitTime,
 		logger,
 	)
 	return &Assembly[T]{

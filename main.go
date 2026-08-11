@@ -17,7 +17,7 @@ func Main[T any](
 	boot := bootstrap.New(
 		version,
 		remoteConfig,
-		endpoints,
+		cluster.Endpoints(endpoints),
 		cluster.HttpTransport,
 	)
 	app := boot.App

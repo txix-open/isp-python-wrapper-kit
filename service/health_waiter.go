@@ -56,20 +56,19 @@ func (s HealthWaiter) Wait(ctx context.Context) error {
 		checkCtx = ctx
 	}
 
-	ticker := time.NewTicker(s.retryInterval)
-	defer ticker.Stop()
-
 	for {
 		err := s.healthRepo.Healthcheck(checkCtx)
 		if err == nil {
 			return nil
 		}
+		s.logger.Warn(ctx, "healthcheck failed", log.Any("error", err))
 
+		timer := time.NewTimer(s.retryInterval)
 		select {
+		case <-timer.C:
 		case <-checkCtx.Done():
+			timer.Stop()
 			return errors.WithMessage(checkCtx.Err(), "healthcheck stopped")
-		case <-ticker.C:
-			s.logger.Warn(ctx, "healthcheck failed", log.Any("error", err))
 		}
 	}
 }

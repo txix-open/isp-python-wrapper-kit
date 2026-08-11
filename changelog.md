@@ -1,3 +1,5 @@
+## 1.2.1
+* При завершении процесса во время ожидания `GET /internal/health` (успешного поднятия сервиса), `healthcheck` прекращается для этого процесса
 ## 1.2.0
 * Перед вызовом `/receive_module_addresses` ожидается success ответ (http status code от 200 до 299) на `GET /internal/health`
 ## 1.1.2

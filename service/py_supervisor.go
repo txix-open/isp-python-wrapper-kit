@@ -160,14 +160,16 @@ func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, cha
 			}
 		}
 
+		healthCtx, cancelHealth := context.WithCancel(ctx)
 		healthCh := make(chan error, 1)
 
 		go func() {
-			healthCh <- s.healthWaiter.Wait(ctx)
+			healthCh <- s.healthWaiter.Wait(healthCtx)
 		}()
 
 		select {
 		case err := <-healthCh:
+			cancelHealth()
 			if err != nil {
 				s.logger.Error(ctx,
 					"process failed to become healthy",
@@ -180,11 +182,13 @@ func (s *PySupervisor) ensureProcessRunning(ctx context.Context) (*exec.Cmd, cha
 			}
 
 		case err := <-exitCh:
+			cancelHealth()
 			s.logProcessExited(ctx, err)
 			time.Sleep(restartProcessWaitTime)
 			continue
 
 		case <-ctx.Done():
+			cancelHealth()
 			s.stopProcess(ctx, cmd, exitCh)
 			return nil, nil
 		}

@@ -13,6 +13,7 @@ func Main[T any](
 	remoteConfig any,
 	endpoints []cluster.EndpointDescriptor,
 	requiredModules []string,
+	opts ...assembly.Option,
 ) {
 	boot := bootstrap.New(
 		version,
@@ -23,7 +24,11 @@ func Main[T any](
 	app := boot.App
 	logger := app.Logger()
 
-	assembly, err := assembly.New[T](boot, requiredModules)
+	assembly, err := assembly.New[T](
+		boot,
+		requiredModules,
+		opts...,
+	)
 	if err != nil {
 		boot.Fatal(err)
 	}

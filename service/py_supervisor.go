@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -36,8 +37,9 @@ type PySupervisor struct {
 	logger         log.Logger
 	cancel         context.CancelFunc
 
-	innerRepo    InnerRepo
-	modulesHosts map[string][]string
+	innerRepo       InnerRepo
+	modulesHosts    map[string][]string
+	requiredModules string
 
 	configUpdatedCh chan bool
 	upgradeCh       chan upgradeHostsEvent
@@ -67,6 +69,7 @@ func NewPySupervisor(
 		logger:                 logger,
 
 		modulesHosts:    make(map[string][]string, len(requiredModules)),
+		requiredModules: strings.Join(requiredModules, ";"),
 		configUpdatedCh: make(chan bool, 1),
 		upgradeCh:       make(chan upgradeHostsEvent, len(requiredModules)),
 	}
@@ -230,6 +233,7 @@ func (s *PySupervisor) startProcess(ctx context.Context) (*exec.Cmd, chan error)
 	cmd.Env = append(os.Environ(),
 		"BINDING_ADDRESS="+s.bindingAddress,
 		"CONFIG_FILE="+s.configPath,
+		"REQUIRED_MODULES="+s.requiredModules,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -245,6 +249,7 @@ func (s *PySupervisor) startProcess(ctx context.Context) (*exec.Cmd, chan error)
 		log.String("bindingAddress", s.bindingAddress),
 		log.String("configPath", s.configPath),
 		log.String("modulePath", s.pyModulePath),
+		log.String("requiredModules", s.requiredModules),
 	)
 
 	exitCh := make(chan error, 1)

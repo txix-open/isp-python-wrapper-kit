@@ -10,9 +10,9 @@ import (
 	"github.com/txix-open/isp-kit/metrics"
 )
 
-const asmSampleMetrics = `# HELP py_thing A metric.
-# TYPE py_thing gauge
-py_thing 7
+const asmSampleMetrics = `# HELP thing A metric.
+# TYPE thing gauge
+thing 7
 `
 
 func newTestLogger(t *testing.T) *log.Adapter {

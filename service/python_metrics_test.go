@@ -12,12 +12,12 @@ import (
 	"github.com/txix-open/isp-python-wrapper-kit/service"
 )
 
-const sampleMetrics = `# HELP py_handler_total Total requests handled.
-# TYPE py_handler_total counter
-py_handler_total{path="/",method="GET"} 42
-# HELP py_temperature Current temperature.
-# TYPE py_temperature gauge
-py_temperature{unit="c"} 3.14
+const sampleMetrics = `# HELP handler_total Total requests handled.
+# TYPE handler_total counter
+handler_total{path="/",method="GET"} 42
+# HELP temperature Current temperature.
+# TYPE temperature gauge
+temperature{unit="c"} 3.14
 `
 
 func newTestLogger(t *testing.T) *log.Adapter {
@@ -87,18 +87,18 @@ func TestPythonMetricsCollector_PassesThroughCounterAndGauge(t *testing.T) {
 	}
 }
 
-const sampleHistogram = `# HELP py_request_duration_seconds Request duration.
-# TYPE py_request_duration_seconds histogram
-py_request_duration_seconds_bucket{le="0.5"} 1
-py_request_duration_seconds_bucket{le="1"} 2
-py_request_duration_seconds_bucket{le="+Inf"} 2
-py_request_duration_seconds_sum 0.9
-py_request_duration_seconds_count 2
-# HELP py_latency Summary of latency.
-# TYPE py_latency summary
-py_latency{route="/",quantile="0.5"} 1.5
-py_latency_sum{route="/"} 4.5
-py_latency_count{route="/"} 3
+const sampleHistogram = `# HELP request_duration_seconds Request duration.
+# TYPE request_duration_seconds histogram
+request_duration_seconds_bucket{le="0.5"} 1
+request_duration_seconds_bucket{le="1"} 2
+request_duration_seconds_bucket{le="+Inf"} 2
+request_duration_seconds_sum 0.9
+request_duration_seconds_count 2
+# HELP latency Summary of latency.
+# TYPE latency summary
+latency{route="/",quantile="0.5"} 1.5
+latency_sum{route="/"} 4.5
+latency_count{route="/"} 3
 `
 
 func TestPythonMetricsCollector_PassesThroughHistogramAndSummary(t *testing.T) {

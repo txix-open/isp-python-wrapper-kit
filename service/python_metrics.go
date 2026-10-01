@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,6 +19,7 @@ const (
 	pythonMetricsEndpoint      = "/internal/metrics"
 	pythonMetricsScrapeTimeout = 3 * time.Second
 
+	pythonMetricsPrefix = "py_"
 	pythonMetricsUpName = "py_metrics_scrape_up"
 	pythonMetricsUpHelp = "Whether the python process /internal/metrics was scraped successfully (1) or not (0)."
 )
@@ -79,6 +81,11 @@ func (c *PythonMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c *PythonMetricsCollector) emitFamily(ch chan<- prometheus.Metric, mf *dto.MetricFamily) {
+	name := mf.GetName()
+	if !strings.HasPrefix(name, pythonMetricsPrefix) {
+		name = pythonMetricsPrefix + name
+	}
+
 	labelNames := make([]string, 0, len(mf.GetMetric()[0].GetLabel()))
 	seen := make(map[string]struct{}, len(mf.GetMetric()[0].GetLabel()))
 	for _, lp := range mf.GetMetric()[0].GetLabel() {
@@ -89,7 +96,7 @@ func (c *PythonMetricsCollector) emitFamily(ch chan<- prometheus.Metric, mf *dto
 		labelNames = append(labelNames, lp.GetName())
 	}
 
-	desc := prometheus.NewDesc(mf.GetName(), mf.GetHelp(), labelNames, nil)
+	desc := prometheus.NewDesc(name, mf.GetHelp(), labelNames, nil)
 
 	for _, m := range mf.GetMetric() {
 		labelValues := make([]string, 0, len(m.GetLabel()))

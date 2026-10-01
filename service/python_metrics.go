@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -81,10 +80,7 @@ func (c *PythonMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c *PythonMetricsCollector) emitFamily(ch chan<- prometheus.Metric, mf *dto.MetricFamily) {
-	name := mf.GetName()
-	if !strings.HasPrefix(name, pythonMetricsPrefix) {
-		name = pythonMetricsPrefix + name
-	}
+	name := pythonMetricsPrefix + mf.GetName()
 
 	labelNames := make([]string, 0, len(mf.GetMetric()[0].GetLabel()))
 	seen := make(map[string]struct{}, len(mf.GetMetric()[0].GetLabel()))

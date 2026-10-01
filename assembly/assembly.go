@@ -12,6 +12,7 @@ import (
 	"github.com/txix-open/isp-kit/config"
 	"github.com/txix-open/isp-kit/http/httpcli"
 	"github.com/txix-open/isp-kit/http/httpclix"
+	"github.com/txix-open/isp-kit/metrics"
 	"github.com/txix-open/isp-kit/rc"
 
 	"github.com/pkg/errors"
@@ -67,6 +68,10 @@ func New[T any](
 		httpcli.WithMiddlewares(httpclix.Log(logger)),
 	)
 	innerCli.GlobalRequestConfig().BaseUrl = fmt.Sprintf("http://%s", boot.BindingAddress)
+
+	metricsCli := httpcli.New()
+	metricsCli.GlobalRequestConfig().BaseUrl = fmt.Sprintf("http://%s", boot.BindingAddress)
+	registerPythonMetrics(boot.MetricsRegistry, metricsCli, logger)
 
 	cfg, err := getConfig(boot.App.Config())
 	if err != nil {
@@ -176,4 +181,8 @@ func getConfig(cfg *config.Config) (*AssemblyConfig, error) {
 		HealthcheckRetryDelay: cfg.Optional().Duration("python.healthcheckRetryDelay", defaultHealthcheckRetryDelay),
 		HealthcheckTimeout:    cfg.Optional().Duration("python.healthcheckTimeout", defaultHealthcheckTimeout),
 	}, nil
+}
+
+func registerPythonMetrics(reg *metrics.Registry, cli *httpcli.Client, logger log.Logger) {
+	reg.GetOrRegister(service.NewPythonMetricsCollector(cli, logger))
 }
